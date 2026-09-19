@@ -1,4 +1,10 @@
-"""医美注射全程追溯的基础运行入口。"""
+"""医美注射全程追溯的运行入口。
+
+用法：
+  python3 service.py --check      基础自检
+  python3 service.py --scenario   跨门店复诊追查验收（49 项硬断言）
+  python3 service.py --port 8000  健康检查服务
+"""
 
 import argparse
 import json
@@ -35,10 +41,23 @@ def main():
     parser = argparse.ArgumentParser(description=SERVICE_NAME)
     parser.add_argument("--port", type=int, default=8000)
     parser.add_argument("--check", action="store_true")
+    parser.add_argument("--scenario", action="store_true",
+                        help="运行跨门店复诊追查验收场景")
     args = parser.parse_args()
+    if args.scenario:
+        from traceability.scenario import run_scenario
+        summary = run_scenario()
+        print(f"\n汇总：{summary['checks']} 项断言 / "
+              f"{summary['records']} 份归档病历 / "
+              f"{summary['movements']} 条库存移动 / "
+              f"{summary['reminders_due']} 条待处理复诊提醒")
+        return
     if args.check:
         assert health_payload()["service"] == SERVICE_ID
-        print("基础检查通过")
+        # 领域包可导入、规则册版本存在
+        from traceability.rules import RULE_BOOK_VERSION
+        assert RULE_BOOK_VERSION
+        print(f"基础检查通过（规则册 {RULE_BOOK_VERSION}）")
         return
     ThreadingHTTPServer(("0.0.0.0", args.port), Handler).serve_forever()
 
